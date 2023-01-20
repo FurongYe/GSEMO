@@ -1,0 +1,13 @@
+[
+{
+  "directory": "/home/jacob/code/GSEMO/build",
+  "command": "/bin/x86_64-linux-gnu-g++-9   -I../include -I../external/fmt/include -I../external/cxxopts/include -I../external/json/include  -g   -std=gnu++17 -o CMakeFiles/gsemo.dir/gsemo.cpp.o -c /home/jacob/code/GSEMO/gsemo.cpp",
+  "file": "/home/jacob/code/GSEMO/gsemo.cpp"
+},
+
+{
+  "directory": "/home/jacob/code/GSEMO/build",
+  "command": "/bin/x86_64-linux-gnu-g++-9   -I../include -I../external/fmt/include -I../external/cxxopts/include -I../external/json/include  -g   -std=gnu++17 -o CMakeFiles/problems.dir/problems_gecco23.cpp.o -c /home/jacob/code/GSEMO/problems_gecco23.cpp",
+  "file": "/home/jacob/code/GSEMO/problems_gecco23.cpp"
+}
+]
