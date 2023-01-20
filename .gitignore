@@ -1,1 +1,8 @@
 build/
+venv 
+.vscode 
+data/
+GSEMO.egg-info/*
+*pyc
+__pycache__/
+*.so

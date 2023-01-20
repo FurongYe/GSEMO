@@ -1,4 +1,4 @@
-#include "problems_gecco23.hpp"
+#include "problems.hpp"
 
 namespace operators
 {
@@ -175,10 +175,6 @@ struct MultiSolution
         return dis;
     }
 
-    void distance_to_front(const std::vector<MultiSolution<Args...>> &other)
-    {
-    }
-
     void print() const
     {
         std::cout << "(";
@@ -205,18 +201,6 @@ void print(const std::vector<MultiSolution<Args...>> &p)
     std::cout << "}\n";
 }
 
-void bitflip(std::vector<int> &x, const double pm)
-{
-    for (size_t i = 0; i < x.size(); i++)
-    {
-        const auto ri = ioh::common::random::real();
-        if (ri < pm)
-        {
-            x[i] = abs(x[i] - 1);
-        }
-    }
-}
-
 void bitflip_index(std::vector<int> &x, const int flip_bits_number)
 {
     std::vector<size_t> flip_index;
@@ -225,10 +209,9 @@ void bitflip_index(std::vector<int> &x, const int flip_bits_number)
         x[pos] = abs(x[pos] - 1);
 }
 
-void bitflip_binom(std::vector<int> &x, const double pm, const int m = 0)
+
+void bitflip(std::vector<int> &x, const int n)
 {
-    std::binomial_distribution<> d(x.size(), pm);
-    const auto n = std::max(m, d(ioh::common::random::GENERATOR));
     for (const auto &pos : ioh::common::random::integers(n, 0, (int)x.size() - 1))
         x[pos] = abs(x[pos] - 1);
 }
@@ -395,8 +378,13 @@ namespace adaptation
                 c++;
                 i = std::distance(stats.successes.begin(), std::find(stats.successes.begin(), stats.successes.end(), true));
             }
-
             this->r = new_population[i].l;
+        }
+
+        void setup_problem(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem) override
+        {
+            TwoRate<SolutionType>::setup_problem(problem);
+            c = 0;
         }
 
     private:
@@ -449,11 +437,9 @@ struct GSEMO
         std::vector<GSolution> pareto_front{1};
         pareto_front[0].x = ioh::common::random::integers(problem->meta_data().n_variables, 0, 1);
         pareto_front[0].eval(problem);
-        --budget;
-
         strategy->setup_problem(problem);
 
-        while (budget > 0)
+        while (problem->state().evaluations < budget)
         {
             auto new_population = std::vector<GSolution>(strategy->lambda);
 
@@ -468,12 +454,12 @@ struct GSEMO
                 candidate.l = strategy->generate_l(candidate.pm);
 
                 // Mutate
-                bitflip_index(candidate.x, candidate.l);
+                bitflip(candidate.x, candidate.l);
 
                 // Evaluate
                 candidate.eval(problem);
 
-                if (--budget <= 0 || problem->state().optimum_found)
+                if (problem->state().evaluations > budget)
                     break;
 
                 if (verbose_rate and i % verbose_rate == 0)
@@ -505,54 +491,3 @@ struct GSEMO
         return pareto_front;
     }
 };
-
-/***
- * ./main problem_id dimension static/tworate/varctrl/lognormal lambda p budget runs
- */
-int main(int argc, char *argv[])
-{
-    // if (argc < 6)
-    // {
-    //     std::cerr << "Some parameters are missing" << std::endl;
-    // }
-
-    // int problem_id = std::atoi(argv[1]);
-    // int dimension = std::atoi(argv[2]);
-    // std::string algorithm_name = argv[3];
-    // int lambda = std::atoi(argv[4]);
-    // double pm = std::atoi(argv[5]) / static_cast<double>(dimension);
-    // int budget = std::atoi(argv[6]);
-    // int runs = std::atoi(argv[7]);
-
-    int problem_id = 1;
-    int dimension = 100;
-    int lambda = 2;
-    double pm = 1 / static_cast<double>(dimension);
-    int budget = 100000;
-    int runs = 1;
-
-    using namespace ioh::common;
-    random::seed(10);
-
-    bool force_flip = true;
-
-    auto problem = get_problem(problem_id, dimension);
-    
-    std::string algorithm_name = "static";
-    std::string exp_name = algorithm_name + "L" + argv[4] + "P" + argv[5];
-    // std::string exp_name = "test";
-    // auto logger =
-    //     ioh::logger::Analyzer({ioh::trigger::always}, {ioh::watch::violation}, "/data/yef/MO", exp_name, exp_name, exp_name);
-
-    // problem->attach_logger(logger);
-
-    for (int i = 0; i < runs; ++i)
-    {
-        GSEMO<OptimizationType::MAX, OptimizationType::MAX> opt(budget, force_flip, pm, lambda, algorithm_name);
-        auto p = opt(problem);
-        print(p);
-        std::cout << p.size() << std::endl;
-        std::cout << *problem << std::endl;
-        problem->reset();
-    }
-}
