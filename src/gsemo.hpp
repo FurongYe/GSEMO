@@ -175,6 +175,21 @@ struct MultiSolution
         return dis;
     }
 
+    double euclidean_distance(const MultiSolution<Args...> &other) const
+    {
+        double dis;
+        int i = 0;
+        (
+            [&]
+            {
+                dis += pow(operators::distance_<Args>(y[i], other.y[i]),2);
+                i++;
+            }(),
+            ...);
+        dis = sqrt(dis) / y.size();
+        return dis;
+    }
+
     void print() const
     {
         std::cout << "(";
@@ -193,7 +208,7 @@ struct MultiSolution
 };
 
 template <ioh::common::OptimizationType... Args>
-void print(const std::vector<MultiSolution<Args...>> &p)
+void print(const std::vector<MultiSolution<Args...> > &p)
 {
     std::cout << "{";
     for (const auto &z : p)
@@ -217,31 +232,8 @@ void bitflip(std::vector<int> &x, const int n)
 }
 
 namespace adaptation
-{
-    struct PopulationStats
-    {
-        bool has_non_dominated_solution;
-        std::vector<bool> successes;
-        std::vector<double> distances;
-
-        PopulationStats(size_t n) : has_non_dominated_solution(false), successes(n, false), distances(n, 0.) {}
-
-        template <typename SolutionType>
-        PopulationStats(const std::vector<SolutionType> &pareto_front, const std::vector<SolutionType> &new_population) : PopulationStats(new_population.size())
-        {
-            for (size_t i = 0; i < new_population.size(); i++)
-            {
-                auto any_dominates = false;
-                for (const auto &z : pareto_front)
-                {
-                    distances[i] += abs(z.distance(new_population[i]));
-                    any_dominates |= z.strictly_dominates(new_population[i]);
-                }
-                successes[i] = !any_dominates;
-                has_non_dominated_solution |= !any_dominates;
-            }
-        }
-    };
+{   
+    
 
     template <typename SolutionType>
     struct Strategy
@@ -250,8 +242,12 @@ namespace adaptation
         double pm;
         int lambda;
         int n;
+        // Make sure that the references point are ranked by the first obj.
+        std::vector<SolutionType> pareto_reference;
+        SolutionType hv_reference;
+        int adapt_metric; // 1: hypervolume 2: IGD 3: NOPareto
 
-        Strategy(const double pm, const int lambda) : pm0(pm), pm(pm), lambda(lambda) {}
+        Strategy(const double pm, const int lambda, const int adapt_metric = 1) : pm0(pm), pm(pm), lambda(lambda), adapt_metric(adapt_metric) {}
 
         virtual double generate_pm(const int) const
         {
@@ -267,12 +263,107 @@ namespace adaptation
             return l;
         }
 
-        virtual void setup_problem(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem)
+        virtual void setup_problem(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem, const std::vector<SolutionType> &pareto_front, const SolutionType & hv)
         {
-            n = problem->meta_data().n_variables;
+            this->n = problem->meta_data().n_variables;
+            this->pareto_reference = pareto_front;
+            this->hv_reference = hv;
+            // std::sort(pareto_reference.begin(), pareto_reference.end(), [](const SolutionType& a, const SolutionType& b) {return a.y[0] < b.y[0];});
         }
 
         virtual void adapt(const std::vector<SolutionType> &pareto_front, const std::vector<SolutionType> &new_population) {}
+
+        double pareto_metric(const std::vector<SolutionType> &new_population) {
+            switch (adapt_metric)
+            {
+                case 1:
+                    return hypervolume(new_population);
+                    break;
+                case 2:
+                    return -inverted_generational_distance(new_population);
+                    break;
+                case 3:
+                    return number_of_pareto(new_population);
+                    break;
+                default:
+                    return -1;
+                    break;
+            }   
+        }
+
+        double hypervolume(const std::vector<SolutionType> &new_population) 
+        {
+            // std::sort(new_population.begin(), new_population.end(), [](const SolutionType& a, const SolutionType& b) {return a.y[0] < b.y[0];});
+            double volume = 0;
+            double last_x = this->hv_reference.y[0];
+            for (const auto & p : new_population)
+            {
+                if (p.y[0] == last_x) 
+                {
+                    volume += (p.y[1] - this->hv_reference.y[1]);
+                }
+                else {
+                    volume += (p.y[1] - this->hv_reference.y[1]) * (p.y[0] - last_x);
+                }
+            }
+            return volume;
+        }
+
+        double inverted_generational_distance(const std::vector<SolutionType> &new_population) 
+        {
+            // std::sort(new_population.begin(), new_population.end(), [](const SolutionType& a, const SolutionType& b) {return a.y[0] < b.y[0];});
+            double igd = 0;
+            for (size_t i = 0; i != this->pareto_reference.size(); ++i)
+            {
+                double tmp = n * n  + 1;
+                for(size_t j = 0; j != new_population.size(); ++j) 
+                {
+                    if ( pow((new_population[j].y[0] - pareto_reference[i].y[0]),2) > pow(tmp ,2) ) { break; } 
+                    double d = pareto_reference[i].euclidean_distance(new_population[j]);
+                    if (tmp < d) { tmp = d;}
+                }
+                igd += pow(tmp,2);
+            }
+            return igd / this->pareto_reference.size();
+        }
+
+        double number_of_pareto(const std::vector<SolutionType> &new_population) 
+        {
+            // std::sort(new_population.begin(), new_population.end(), [](const SolutionType& a, const SolutionType& b) {return a.y[0] < b.y[0];});
+            double found = 0;
+            size_t j = 0;
+            for (size_t i = 0; i != this->pareto_reference.size();)
+            {
+                if(pareto_reference[i].y[0] == new_population[j].y[0]) {
+                    if(pareto_reference[i] == new_population[j]) {found += 1.0;}
+                    ++i;
+                    ++j;
+                }
+                else if(pareto_reference[i].y[0] < new_population[j].y[0]) {
+                    ++i;
+                } 
+                else if(pareto_reference[i].y[0] > new_population[j].y[0]) {
+                    ++j;
+                }
+                if (j == new_population.size()) break;
+            }
+            return found;
+        }
+
+        
+        std::vector<double> population_stats(const std::vector<SolutionType> &pareto_front, const std::vector<SolutionType> &new_population)
+        {
+            
+            std::vector<double> metrics(new_population.size(), -1.0);
+            auto tmp_pareto_front = pareto_front;
+            for (size_t i = 0; i < new_population.size(); i++)
+            {
+                tmp_pareto_front.push_back(new_population[i]);
+                metrics[i] = this->pareto_metric(tmp_pareto_front);
+                tmp_pareto_front.pop_back();
+            }
+            return metrics;
+        }
     };
 
     template <typename SolutionType>
@@ -290,29 +381,20 @@ namespace adaptation
             return r * 2.0 / this->n;
         };
 
-        void setup_problem(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem) override
+        void setup_problem(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem, const std::vector<SolutionType> &pareto_front, const SolutionType & hv) override
         {
-            Strategy<SolutionType>::setup_problem(problem);
+            Strategy<SolutionType>::setup_problem(problem,pareto_front,hv);
             r = this->pm0 * this->n;
         }
 
         virtual void adapt(const std::vector<SolutionType> &pareto_front, const std::vector<SolutionType> &new_population) override
         {
             // TODO: this is was not defined according to the paper, I changed it.
-            const auto &stats = PopulationStats(pareto_front, new_population);
-            const size_t half = stats.successes.size() / 2;
+            auto metrics = this->population_stats(pareto_front, new_population);
+            const size_t half = new_population.size() / 2;
             double s;
-            if (stats.has_non_dominated_solution)
-            {
-                const auto s1 = std::accumulate(stats.successes.begin(), stats.successes.begin() + half, 0);
-                const auto s2 = std::accumulate(stats.successes.begin() + half, stats.successes.end(), 0);
-                s = s1 > s2 ? 0.75 : 0.25;
-            }
-            else
-            {
-                const auto min_element = std::distance(stats.distances.begin(), std::min_element(stats.distances.begin(), stats.distances.end()));
-                s = min_element < half ? 0.75 : 0.25;
-            }
+            size_t i = std::distance(metrics.begin(), std::max_element(metrics.begin(), metrics.end()));
+            s = i < half ? 0.75 : 0.25;
             if (ioh::common::random::real() <= s) {
                 r = std::max(r / 2., 0.5);
             } else {
@@ -339,13 +421,9 @@ namespace adaptation
         }
         virtual void adapt(const std::vector<SolutionType> &pareto_front, const std::vector<SolutionType> &new_population) override
         {
-            auto stats = PopulationStats(pareto_front, new_population);
+            auto metrics = this->population_stats(pareto_front, new_population);
             size_t i;
-            if (!stats.has_non_dominated_solution){
-                i = std::distance(stats.distances.begin(), std::min_element(stats.distances.begin(), stats.distances.end()));
-            } else {
-                i = std::distance(stats.successes.begin(), std::find(stats.successes.begin(), stats.successes.end(), true));
-            }
+            i = std::distance(metrics.begin(), std::max_element(metrics.begin(), metrics.end()));
             this->pm = std::max(0.25 / this->n, std::min(0.5, new_population[i].pm));
         }
     };
@@ -355,7 +433,7 @@ namespace adaptation
     {
         using TwoRate<SolutionType>::TwoRate;
 
-        int generate_l(const double pm) const
+        int generate_l(const double pm) const override
         {
             const double dn = static_cast<double>(this->n);
             std::normal_distribution<> d{this->r, this->r * (1 - this->r / dn) * pow(F, c)};
@@ -369,21 +447,23 @@ namespace adaptation
 
         virtual void adapt(const std::vector<SolutionType> &pareto_front, const std::vector<SolutionType> &new_population) override
         {
-            auto stats = PopulationStats(pareto_front, new_population);
+            auto metrics = this->population_stats(pareto_front, new_population);
             size_t i;
-            if (!stats.has_non_dominated_solution){
-                c = 0;
-                i = std::distance(stats.distances.begin(), std::min_element(stats.distances.begin(), stats.distances.end()));
-            } else {
-                c++;
-                i = std::distance(stats.successes.begin(), std::find(stats.successes.begin(), stats.successes.end(), true));
+            i = std::distance(metrics.begin(), std::max_element(metrics.begin(), metrics.end()));
+            if (this->r == new_population[i].l) 
+            {
+                c += 1;
             }
-            this->r = new_population[i].l;
+            else 
+            {
+                c = 0;
+                this->r = new_population[i].l;
+            }
         }
 
-        void setup_problem(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem) override
+        void setup_problem(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem, const std::vector<SolutionType> &pareto_front, const SolutionType & hv) override
         {
-            TwoRate<SolutionType>::setup_problem(problem);
+            TwoRate<SolutionType>::setup_problem(problem,pareto_front,hv);
             c = 0;
         }
 
@@ -391,18 +471,52 @@ namespace adaptation
         double F = 0.98;
         int c = 0;
     };
+    
+    template <typename SolutionType>
+    struct NormEA : TwoRate<SolutionType>
+    {
+        using TwoRate<SolutionType>::TwoRate;
+
+        int generate_l(const double pm) const override
+        {
+            const double dn = static_cast<double>(this->n);
+            std::normal_distribution<> d{this->r, this->r * (1 - this->r / dn)};
+
+            double l = d(ioh::common::random::GENERATOR);
+            while (l < 1 || l > this->n / 2)
+                l = d(ioh::common::random::GENERATOR);
+
+            return static_cast<double>(std::round(l));
+        }
+
+        virtual void adapt(const std::vector<SolutionType> &pareto_front, const std::vector<SolutionType> &new_population) override
+        {
+            auto metrics = this->population_stats(pareto_front, new_population);
+            size_t i;
+            i = std::distance(metrics.begin(), std::max_element(metrics.begin(), metrics.end()));
+            this->r = new_population[i].l;
+        }
+
+        void setup_problem(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem, const std::vector<SolutionType> &pareto_front, const SolutionType & hv) override
+        {
+            TwoRate<SolutionType>::setup_problem(problem,pareto_front,hv);
+        }
+    };
+
 
     template <typename T>
-    std::unique_ptr<adaptation::Strategy<T>> get(const std::string &name, const double pm, const int lambda)
+    std::unique_ptr<adaptation::Strategy<T> > get(const std::string &name, const double pm, const int lambda, const int adapt_metric)
     {
         if (name == "static")
-            return std::make_unique<adaptation::Static<T>>(pm, lambda);
+            return std::make_unique<adaptation::Static<T> >(pm, lambda);
         else if (name == "TwoRate")
-            return std::make_unique<adaptation::TwoRate<T>>(pm, lambda);
+            return std::make_unique<adaptation::TwoRate<T> >(pm, lambda, adapt_metric);
         else if (name == "varctrl")
-            return std::make_unique<adaptation::VarCntrl<T>>(pm, lambda);
+            return std::make_unique<adaptation::VarCntrl<T> >(pm, lambda, adapt_metric);
+        else if (name == "normea")
+            return std::make_unique<adaptation::NormEA<T> >(pm, lambda, adapt_metric);
         else if (name == "logNormal")
-            return std::make_unique<adaptation::LogNormal<T>>(pm, lambda);
+            return std::make_unique<adaptation::LogNormal<T> >(pm, lambda, adapt_metric);
         throw std::invalid_argument(name + " is an unknown adaptation strategy type");
     }
 }
@@ -411,33 +525,44 @@ template <ioh::common::OptimizationType... Args>
 struct GSEMO
 {
     using GSolution = MultiSolution<Args...>;
-
     int budget;
     bool force_flip; // TODO: this is now unused
     int verbose_rate;
     std::string algorithm_name;
-    std::unique_ptr<adaptation::Strategy<GSolution>> strategy;
+    std::unique_ptr<adaptation::Strategy<GSolution> > strategy;
 
     GSEMO(const int b = 6000,
           const bool ff = true,
           const double pm = 0.01,
           const int lambda = 1,
+          const int adapt_metric = 1,
           const std::string algorithm_name = "static",
           const int v = 0)
         : budget(b),
           force_flip(ff),
           verbose_rate(v),
           algorithm_name(algorithm_name),
-          strategy(adaptation::get<GSolution>(algorithm_name, pm, lambda))
+          strategy(adaptation::get<GSolution>(algorithm_name, pm, lambda, adapt_metric))
     {
     }
 
     std::vector<GSolution> operator()(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem)
     {
+        // Preparing pareto_front_star and hv_reference
+        auto pareto_star = std::vector<GSolution>(pre_pareto_y.size());
+        for (size_t i = 0; i != pre_pareto_y.size(); ++i)
+        {
+            pareto_star[i].y[0] = pre_pareto_y[i][0];
+            pareto_star[i].y[1] = pre_pareto_y[i][1];
+        }
+        GSolution hv;
+        hv.y[0] = pre_hv_reference[0];
+        hv.y[1] = pre_hv_reference[1]; 
+
         std::vector<GSolution> pareto_front{1};
         pareto_front[0].x = ioh::common::random::integers(problem->meta_data().n_variables, 0, 1);
         pareto_front[0].eval(problem);
-        strategy->setup_problem(problem);
+        strategy->setup_problem(problem,pareto_star,hv);
 
         while (problem->state().evaluations < budget)
         {

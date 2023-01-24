@@ -1,5 +1,9 @@
 #include "problems.hpp"
 
+
+std::vector<std::array<double, 2> > pre_pareto_y;
+std::array<double, 2> pre_hv_reference = {0,0};
+
 double onemax_constraint(const std::vector<int> &x)
 {
     return (double)x.size() - std::accumulate(x.begin(), x.end(), 0.0);
@@ -66,6 +70,12 @@ std::shared_ptr<ioh::problem::IntegerSingleObjective> get_problem(const int id, 
         auto &oneminmaxfactory = ioh::problem::ProblemRegistry<ioh::problem::PBO>::instance();
         problem = oneminmaxfactory.create(id, 1, dimension);
         problem->add_constraint(make_constraint(onemax_constraint));
+        if (pre_pareto_y.size() != 0) {pre_pareto_y.clear();}
+        for (size_t i = 0; i <= dimension; ++i) {
+            std::array<double, 2> y = {static_cast<double>(i), static_cast<double>(dimension- i)};
+            pre_pareto_y.push_back(y);
+
+        }
         break;
     }
     case 2:
@@ -73,6 +83,18 @@ std::shared_ptr<ioh::problem::IntegerSingleObjective> get_problem(const int id, 
         auto &leadingonesfactory = ioh::problem::ProblemRegistry<ioh::problem::PBO>::instance();
         problem = leadingonesfactory.create(id, 1, dimension);
         problem->add_constraint(make_constraint(leadingones_constraint));
+        
+        if (pre_pareto_y.size() != 0) {pre_pareto_y.clear();}
+        std::array<double, 2> y = {0.0, static_cast<double>(dimension)};
+        pre_pareto_y.push_back(y);
+        for (size_t i = 1; i < dimension; ++i) {
+            y[0] = static_cast<double>(i);
+            y[1] = static_cast<double>(dimension - 1 -i);
+            pre_pareto_y.push_back(y);
+        }
+        y[0] = static_cast<double>(dimension);
+        y[1] = 0.0;
+        pre_pareto_y.push_back(y);
         break;
     }
     case 3:
