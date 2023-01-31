@@ -2,7 +2,7 @@
 
 
 std::vector<std::array<double, 2> > pre_pareto_y;
-std::array<double, 2> pre_hv_reference = {0,0};
+std::array<double, 2> pre_hv_reference = {-1,-1};
 
 double onemax_constraint(const std::vector<int> &x)
 {
@@ -108,6 +108,19 @@ std::shared_ptr<ioh::problem::IntegerSingleObjective> get_problem(const int id, 
         auto &jumpfactory = ioh::problem::ProblemRegistry<ioh::problem::IntegerSingleObjective>::instance();
         problem = jumpfactory.create("onejumpzerojump", 1, dimension);
         problem->add_constraint(make_constraint(jump_constraint));
+
+        int k = 2;
+        if (pre_pareto_y.size() != 0) {pre_pareto_y.clear();}
+        std::array<double, 2> y = {0.0 + k, static_cast<double>(dimension) + k};
+        pre_pareto_y.push_back(y);
+        for (size_t i = 2 * k; i <= dimension; ++i) {
+            y[0] = static_cast<double>(i);
+            y[1] = static_cast<double>(2* k + dimension - i);
+            pre_pareto_y.push_back(y);
+        }
+        y[0] = static_cast<double>(dimension) + k;
+        y[1] = 0.0 + k;
+        pre_pareto_y.push_back(y);
         break;
     }
     default:

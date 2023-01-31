@@ -133,6 +133,11 @@ struct MultiSolution
         return true;
     }
 
+    bool operator<(const MultiSolution<Args...> &other) const
+    {
+        return (y[0] < other.y[0]);
+    }
+
     bool dominated_by(const MultiSolution<Args...> &other) const
     {
         bool dominated = true;
@@ -293,18 +298,13 @@ namespace adaptation
 
         double hypervolume(const std::vector<SolutionType> &new_population) 
         {
-            // std::sort(new_population.begin(), new_population.end(), [](const SolutionType& a, const SolutionType& b) {return a.y[0] < b.y[0];});
+            // std::sort(new_population.begin(), new_population.end());
             double volume = 0;
             double last_x = this->hv_reference.y[0];
             for (const auto & p : new_population)
-            {
-                if (p.y[0] == last_x) 
-                {
-                    volume += (p.y[1] - this->hv_reference.y[1]);
-                }
-                else {
-                    volume += (p.y[1] - this->hv_reference.y[1]) * (p.y[0] - last_x);
-                }
+            {   
+                volume += (p.y[1] - this->hv_reference.y[1]) * (p.y[0] - last_x);
+                last_x = p.y[0];
             }
             return volume;
         }
@@ -318,7 +318,7 @@ namespace adaptation
                 double tmp = n * n  + 1;
                 for(size_t j = 0; j != new_population.size(); ++j) 
                 {
-                    if ( pow((new_population[j].y[0] - pareto_reference[i].y[0]),2) > pow(tmp ,2) ) { break; } 
+                    if ( pow((new_population[j].y[0] - pareto_reference[i].y[0]),2) > tmp  ) { break; } 
                     double d = pareto_reference[i].euclidean_distance(new_population[j]);
                     if (tmp < d) { tmp = d;}
                 }
@@ -329,7 +329,7 @@ namespace adaptation
 
         double number_of_pareto(const std::vector<SolutionType> &new_population) 
         {
-            // std::sort(new_population.begin(), new_population.end(), [](const SolutionType& a, const SolutionType& b) {return a.y[0] < b.y[0];});
+            // std::sort(new_population.begin(), new_population.end());
             double found = 0;
             size_t j = 0;
             for (size_t i = 0; i != this->pareto_reference.size();)
@@ -359,6 +359,7 @@ namespace adaptation
             for (size_t i = 0; i < new_population.size(); i++)
             {
                 tmp_pareto_front.push_back(new_population[i]);
+                std::sort(tmp_pareto_front.begin(),tmp_pareto_front.end());
                 metrics[i] = this->pareto_metric(tmp_pareto_front);
                 tmp_pareto_front.pop_back();
             }
@@ -590,7 +591,9 @@ struct GSEMO
                 if (verbose_rate and i % verbose_rate == 0)
                     print(pareto_front);
             }
-
+            
+            // Sort the current 
+            // std::sort(new_population.begin(), new_population.end())
             strategy->adapt(pareto_front, new_population);
 
             for (const auto &np : new_population)
@@ -612,6 +615,28 @@ struct GSEMO
                 if (!any_dominates)
                     pareto_front = non_dominated_solutions;
             }
+            
+
+            // Check if all the pareto solutions are found.
+            // We know that both lists are sorted.
+            if (pareto_front.size() ==  pareto_star.size()) 
+            {
+                bool hit_all_pareto = true;
+                std::sort(pareto_front.begin(), pareto_front.end());
+                for (size_t i = 0; i != pareto_star.size(); ++i)
+                {
+                    if ( (pareto_front[i].y[0] != pareto_star[i].y[0] ) || (pareto_front[i].y[1] != pareto_star[i].y[1]) )
+                    {
+                        hit_all_pareto = false;
+                        break;
+                    }
+                }
+                if (hit_all_pareto) 
+                {
+                    break;
+                }
+            }
+            
         }
         return pareto_front;
     }
