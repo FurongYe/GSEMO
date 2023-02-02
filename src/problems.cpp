@@ -27,7 +27,7 @@ double onejump(const std::vector<int> &x)
     int xones = std::accumulate(x.begin(), x.end(), 0.0);
     double result;
 
-    if (xones != x.size() && xones <= x.size() - k)
+    if (xones == x.size() || xones <= x.size() - k)
     {
         result = xones + k;
     }
@@ -44,7 +44,7 @@ double jump_constraint(const std::vector<int> &x)
     int xzeros = x.size() - std::accumulate(x.begin(), x.end(), 0.0);
     double result;
 
-    if (xzeros != x.size() && xzeros <= x.size() - k)
+    if (xzeros == x.size() || xzeros <= x.size() - k)
     {
         result = xzeros + k;
     }
