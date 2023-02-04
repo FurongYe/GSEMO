@@ -206,9 +206,9 @@ struct MultiSolution
     void eval(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem)
     {
         y[0] = (*problem)(x);
-        for (size_t i = 1; i < S; i++)
+        for (size_t i = 1; i < S; i++) {
             y[i] = problem->constraints()[i - 1]->violation();
-
+        }
     }
 };
 
@@ -522,6 +522,9 @@ namespace adaptation
     }
 }
 
+
+    
+
 template <ioh::common::OptimizationType... Args>
 struct GSEMO
 {
@@ -545,6 +548,10 @@ struct GSEMO
           algorithm_name(algorithm_name),
           strategy(adaptation::get<GSolution>(algorithm_name, pm, lambda, adapt_metric))
     {
+    }
+
+    static bool compare(const GSolution & a, const GSolution &b) {
+        return a.y[0] < b.y[0];
     }
 
     std::vector<GSolution> operator()(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem)
@@ -622,7 +629,7 @@ struct GSEMO
             if (pareto_front.size() ==  pareto_star.size()) 
             {
                 bool hit_all_pareto = true;
-                std::sort(pareto_front.begin(), pareto_front.end());
+                std::sort(pareto_front.begin(), pareto_front.end(),compare);
                 for (size_t i = 0; i != pareto_star.size(); ++i)
                 {
                     if ( (pareto_front[i].y[0] != pareto_star[i].y[0] ) || (pareto_front[i].y[1] != pareto_star[i].y[1]) )

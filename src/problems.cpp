@@ -11,13 +11,15 @@ double onemax_constraint(const std::vector<int> &x)
 
 double leadingones_constraint(const std::vector<int> &x)
 {
-    auto result = 0;
-    for (auto i = x.size() - 1; i > 0; --i)
-        if (x[i] == 0)
+    int result = 0;
+    for (int i = x.size() - 1; i >= 0; --i) {
+        if (x[i] == 0) {
             result++;
-        else
+        }
+        else {
             break;
-
+        }
+    }
     return static_cast<double>(result);
 }
 
@@ -87,14 +89,14 @@ std::shared_ptr<ioh::problem::IntegerSingleObjective> get_problem(const int id, 
         if (pre_pareto_y.size() != 0) {pre_pareto_y.clear();}
         std::array<double, 2> y = {0.0, static_cast<double>(dimension)};
         pre_pareto_y.push_back(y);
-        for (size_t i = 1; i < dimension; ++i) {
+        for (size_t i = 1; i <= dimension; ++i) {
             y[0] = static_cast<double>(i);
-            y[1] = static_cast<double>(dimension - 1 -i);
+            y[1] = static_cast<double>(dimension -i);
             pre_pareto_y.push_back(y);
         }
-        y[0] = static_cast<double>(dimension);
-        y[1] = 0.0;
-        pre_pareto_y.push_back(y);
+        // y[0] = static_cast<double>(dimension);
+        // y[1] = 0.0;
+        // pre_pareto_y.push_back(y);
         break;
     }
     case 3:
