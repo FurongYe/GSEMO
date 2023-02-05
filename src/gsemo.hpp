@@ -402,6 +402,7 @@ namespace adaptation
             } else {
                 r = std::min(2. * r, this->n / 4.);
             }
+            std::cout << r << std::endl;
         }
 
     protected:
@@ -427,6 +428,7 @@ namespace adaptation
             size_t i;
             i = std::distance(metrics.begin(), std::max_element(metrics.begin(), metrics.end()));
             this->pm = std::max(0.25 / this->n, std::min(0.5, new_population[i].pm));
+            std::cout << this->pm << std::endl;
         }
     };
 
@@ -461,6 +463,7 @@ namespace adaptation
                 c = 0;
                 this->r = new_population[i].l;
             }
+            std::cout << this->r << " " << c << std::endl;
         }
 
         void setup_problem(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem, const std::vector<SolutionType> &pareto_front, const SolutionType & hv) override
@@ -497,6 +500,7 @@ namespace adaptation
             size_t i;
             i = std::distance(metrics.begin(), std::max_element(metrics.begin(), metrics.end()));
             this->r = new_population[i].l;
+            std::cout << this->r << std::endl;
         }
 
         void setup_problem(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem, const std::vector<SolutionType> &pareto_front, const SolutionType & hv) override
