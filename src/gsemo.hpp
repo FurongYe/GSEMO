@@ -191,7 +191,7 @@ struct MultiSolution
                 i++;
             }(),
             ...);
-        dis = sqrt(dis) / y.size();
+        dis = sqrt(dis);
         return dis;
     }
 
@@ -279,16 +279,18 @@ namespace adaptation
         virtual void adapt(const std::vector<SolutionType> &pareto_front, const std::vector<SolutionType> &new_population) {}
 
         double pareto_metric(const std::vector<SolutionType> &new_population) {
+            auto tmp_pareto_front = new_population;
+            std::sort(tmp_pareto_front.begin(),tmp_pareto_front.end());
             switch (adapt_metric)
             {
                 case 1:
-                    return hypervolume(new_population);
+                    return hypervolume(tmp_pareto_front);
                     break;
                 case 2:
-                    return -inverted_generational_distance(new_population);
+                    return -inverted_generational_distance(tmp_pareto_front);
                     break;
                 case 3:
-                    return number_of_pareto(new_population);
+                    return number_of_pareto(tmp_pareto_front);
                     break;
                 default:
                     return -1;
@@ -359,7 +361,6 @@ namespace adaptation
             for (size_t i = 0; i < new_population.size(); i++)
             {
                 tmp_pareto_front.push_back(new_population[i]);
-                std::sort(tmp_pareto_front.begin(),tmp_pareto_front.end());
                 metrics[i] = this->pareto_metric(tmp_pareto_front);
                 tmp_pareto_front.pop_back();
             }
