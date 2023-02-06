@@ -251,7 +251,9 @@ namespace adaptation
         std::vector<SolutionType> pareto_reference;
         SolutionType hv_reference;
         int adapt_metric; // 1: hypervolume 2: IGD 3: NOPareto
-
+        int generation = 1;
+        double adaptive_y_r = 0;
+        
         Strategy(const double pm, const int lambda, const int adapt_metric = 1) : pm0(pm), pm(pm), lambda(lambda), adapt_metric(adapt_metric) {}
 
         virtual double generate_pm(const int) const
@@ -357,12 +359,72 @@ namespace adaptation
         {
             
             std::vector<double> metrics(new_population.size(), -1.0);
-            auto tmp_pareto_front = pareto_front;
-            for (size_t i = 0; i < new_population.size(); i++)
-            {
-                tmp_pareto_front.push_back(new_population[i]);
-                metrics[i] = this->pareto_metric(tmp_pareto_front);
-                tmp_pareto_front.pop_back();
+            if (adapt_metric < 3) {
+                auto tmp_pareto_front = pareto_front;
+                for (size_t i = 0; i < new_population.size(); i++)
+                {
+                    tmp_pareto_front.push_back(new_population[i]);
+                    metrics[i] = this->pareto_metric(tmp_pareto_front);
+                    tmp_pareto_front.pop_back();
+                }
+            } else if (adapt_metric == 4) {
+                if (generation % 10 == 0) {
+                    adaptive_y_r = ioh::common::random::real();
+                }
+
+                double best_y1 = -1;
+                double best_y2 = -1;
+                for (auto const & p: pareto_front ) {
+                    best_y1 = best_y1 > p.y[0] ? best_y1 : p.y[0];
+                    best_y2 = best_y2 > p.y[1] ? best_y2 : p.y[1];
+                }
+                for (size_t i = 0; i < new_population.size(); i++)
+                {
+                    double m1 = new_population[i].y[0] - best_y1;
+                    double m2 = new_population[i].y[1] - best_y2;
+                    // m1 = m1 > 0? m1 : 0;
+                    // m2 = m2 > 0? m2 : 0;
+                    metrics[i] = adaptive_y_r > 0.5 ? m1 : m2;
+                }
+                generation++;
+            } else if (adapt_metric == 5) {
+                if (generation % 50 == 0) {
+                    adaptive_y_r = ioh::common::random::real();
+                }
+
+                double best_y1 = -1;
+                double best_y2 = -1;
+                for (auto const & p: pareto_front ) {
+                    best_y1 = best_y1 > p.y[0] ? best_y1 : p.y[0];
+                    best_y2 = best_y2 > p.y[1] ? best_y2 : p.y[1];
+                }
+                for (size_t i = 0; i < new_population.size(); i++)
+                {
+                    double m1 = new_population[i].y[0] - best_y1;
+                    double m2 = new_population[i].y[1] - best_y2;
+                    // m1 = m1 > 0? m1 : 0;
+                    // m2 = m2 > 0? m2 : 0;
+                    metrics[i] = adaptive_y_r > 0.5 ? m1 : m2;
+                }
+                generation++;
+            }
+            else {
+                double r = ioh::common::random::real();
+
+                double best_y1 = -1;
+                double best_y2 = -1;
+                for (auto const & p: pareto_front ) {
+                    best_y1 = best_y1 > p.y[0] ? best_y1 : p.y[0];
+                    best_y2 = best_y2 > p.y[1] ? best_y2 : p.y[1];
+                }
+                for (size_t i = 0; i < new_population.size(); i++)
+                {
+                    double m1 = new_population[i].y[0] - best_y1;
+                    double m2 = new_population[i].y[1] - best_y2;
+                    // m1 = m1 > 0? m1 : 0;
+                    // m2 = m2 > 0? m2 : 0;
+                    metrics[i] = r > 0.5 ? m1 : m2;
+                }
             }
             return metrics;
         }
@@ -442,11 +504,11 @@ namespace adaptation
             const double dn = static_cast<double>(this->n);
             std::normal_distribution<> d{this->r, this->r * (1 - this->r / dn) * pow(F, c)};
 
-            double l = d(ioh::common::random::GENERATOR);
+            double l = std::round(d(ioh::common::random::GENERATOR));
             while (l < 1 || l > this->n / 2)
                 l = d(ioh::common::random::GENERATOR);
 
-            return static_cast<double>(std::round(l));
+            return static_cast<double>(l);
         }
 
         virtual void adapt(const std::vector<SolutionType> &pareto_front, const std::vector<SolutionType> &new_population) override
@@ -487,11 +549,11 @@ namespace adaptation
             const double dn = static_cast<double>(this->n);
             std::normal_distribution<> d{this->r, this->r * (1 - this->r / dn)};
 
-            double l = d(ioh::common::random::GENERATOR);
+            double l = std::round(d(ioh::common::random::GENERATOR));
             while (l < 1 || l > this->n / 2)
                 l = d(ioh::common::random::GENERATOR);
 
-            return static_cast<double>(std::round(l));
+            return static_cast<double>(l);
         }
 
         virtual void adapt(const std::vector<SolutionType> &pareto_front, const std::vector<SolutionType> &new_population) override
