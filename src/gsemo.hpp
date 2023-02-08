@@ -121,6 +121,7 @@ struct MultiSolution
 {
     static constexpr int S = sizeof...(Args);
     std::array<double, S> y;
+    std::array<double, S> p_y;
     std::vector<int> x;
     double pm;
     int l;
@@ -205,6 +206,8 @@ struct MultiSolution
 
     void eval(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem)
     {
+        p_y[0] = y[0];
+        p_y[1] = y[1];
         y[0] = (*problem)(x);
         for (size_t i = 1; i < S; i++) {
             y[i] = problem->constraints()[i - 1]->violation();
@@ -234,6 +237,7 @@ void bitflip(std::vector<int> &x, const int n)
 {
     for (const auto &pos : ioh::common::random::integers(n, 0, (int)x.size() - 1))
         x[pos] = abs(x[pos] - 1);
+
 }
 
 namespace adaptation
@@ -387,7 +391,7 @@ namespace adaptation
                     metrics[i] = adaptive_y_r > 0.5 ? m1 : m2;
                 }
                 generation++;
-            } else if (adapt_metric == 5) {
+            } else if  (adapt_metric == 5){
                 if (generation % 50 == 0) {
                     adaptive_y_r = ioh::common::random::real();
                 }
@@ -408,7 +412,7 @@ namespace adaptation
                 }
                 generation++;
             }
-            else {
+            else if (adapt_metric == 6)  {
                 double r = ioh::common::random::real();
 
                 double best_y1 = -1;
@@ -421,8 +425,40 @@ namespace adaptation
                 {
                     double m1 = new_population[i].y[0] - best_y1;
                     double m2 = new_population[i].y[1] - best_y2;
-                    // m1 = m1 > 0? m1 : 0;
-                    // m2 = m2 > 0? m2 : 0;
+                    metrics[i] = r > 0.5 ? m1 : m2;
+                }
+            } else if (adapt_metric == 7) {
+                if (generation % 10 == 0) {
+                    adaptive_y_r = ioh::common::random::real();
+                }
+
+                for (size_t i = 0; i < new_population.size(); i++)
+                {
+                    double m1 = new_population[i].y[0] - new_population[i].p_y[0];
+                    double m2 = new_population[i].y[1] - new_population[i].p_y[1];
+                    metrics[i] = adaptive_y_r > 0.5 ? m1 : m2;
+                }
+                generation++;
+            } 
+            else if (adapt_metric == 8) 
+            {
+                if (generation % 50 == 0) {
+                    adaptive_y_r = ioh::common::random::real();
+                }
+                for (size_t i = 0; i < new_population.size(); i++)
+                {
+                    double m1 = new_population[i].y[0] - new_population[i].p_y[0];
+                    double m2 = new_population[i].y[1] - new_population[i].p_y[1] ;
+                    metrics[i] = adaptive_y_r > 0.5 ? m1 : m2;
+                }
+                generation++;
+            } else  {
+                double r = ioh::common::random::real();
+
+                for (size_t i = 0; i < new_population.size(); i++)
+                {
+                    double m1 = new_population[i].y[0] - new_population[i].p_y[0];
+                    double m2 = new_population[i].y[1] - new_population[i].p_y[1];
                     metrics[i] = r > 0.5 ? m1 : m2;
                 }
             }
