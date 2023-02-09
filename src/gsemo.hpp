@@ -206,8 +206,6 @@ struct MultiSolution
 
     void eval(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem)
     {
-        p_y[0] = y[0];
-        p_y[1] = y[1];
         y[0] = (*problem)(x);
         for (size_t i = 1; i < S; i++) {
             y[i] = problem->constraints()[i - 1]->violation();
@@ -686,6 +684,7 @@ struct GSEMO
                 // Select new candidate
                 const auto ri = ioh::common::random::integer(0, pareto_front.size() - 1);
                 candidate.x = pareto_front[ri].x;
+                candidate.p_y = pareto_front[ri].y;
                 candidate.pm = strategy->generate_pm(i);
                 candidate.l = strategy->generate_l(candidate.pm);
 
