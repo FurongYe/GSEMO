@@ -8,6 +8,8 @@ extern std::array<double, 2> pre_hv_reference;
 
 double onemax_constraint(const std::vector<int> &x);
 
+double COCZ_constraint(const std::vector<int> &x);
+
 double leadingones_constraint(const std::vector<int> &x);
 
 double onejump(const std::vector<int> &x);

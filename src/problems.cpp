@@ -23,6 +23,25 @@ double leadingones_constraint(const std::vector<int> &x)
     return static_cast<double>(result);
 }
 
+
+double COCZ(const std::vector<int> &x)
+{
+    return std::accumulate(x.begin(), x.end(), 0.0);
+}
+
+double COCZ_constraint(const std::vector<int> &x) {
+    int result = 0;
+    for (int i = 0; i != x.size(); ++i) {
+        if (i < x.size()/2) {
+            result += (x[i]);
+        }
+        else {
+            result += (1-x[i]);
+        }
+    }
+    return (double)(result);
+}
+
 double onejump(const std::vector<int> &x)
 {
     int k = 2;
@@ -123,6 +142,27 @@ std::shared_ptr<ioh::problem::IntegerSingleObjective> get_problem(const int id, 
         y[0] = static_cast<double>(dimension) + k;
         y[1] = 0.0 + k;
         pre_pareto_y.push_back(y);
+        break;
+    }
+    case 4:
+    {
+        ioh::problem::wrap_function<int, double>(&COCZ,                           // the new function
+                                                 "COCZ",                  // name of the new function
+                                                 ioh::common::OptimizationType::MAX, // optimization type
+                                                 0,                                  // lowerbound
+                                                 1                                   // upperbound
+        );
+        auto &coczfactory = ioh::problem::ProblemRegistry<ioh::problem::IntegerSingleObjective>::instance();
+        problem = coczfactory.create("COCZ", 1, dimension);
+        problem->add_constraint(make_constraint(COCZ_constraint));
+
+        if (pre_pareto_y.size() != 0) {pre_pareto_y.clear();}
+        std::array<double, 2> y = {0,0};
+        for (size_t i = (dimension /2) ; i <= dimension; ++i) {
+            y[0] = static_cast<double>(i);
+            y[1] = dimension - i  + (dimension / 2);
+            pre_pareto_y.push_back(y);
+        }
         break;
     }
     default:
