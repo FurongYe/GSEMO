@@ -9,8 +9,11 @@ target_include_directories(problems PUBLIC
     src 
     external/fmt/include
     external/cxxopts/include 
-    external/json/include 
+    external/json/include
+    /usr/local/include
 )
 
 add_executable(gsemo src/main.cpp)
+add_executable(agsemo src/agsemo.cpp)
 target_link_libraries(gsemo problems)
+target_link_libraries(agsemo problems)
