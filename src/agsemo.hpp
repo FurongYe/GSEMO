@@ -128,7 +128,8 @@ struct MultiSolution
     double previous_dis = -1;
     double dis = -1;
     int c = 0;
-    double pm;
+    double pm = 0.01;
+    double r = 1;
     int l;
 
     bool operator==(const MultiSolution<Args...> &other) const
@@ -261,7 +262,7 @@ namespace adaptation
             return pm0;
         };
 
-        virtual int generate_l(const double pm, const int i = 1, const int pareto_size = 1) const
+        virtual int generate_l(const double pm) const
         {
             std::binomial_distribution<> d{n, pm};
             int l = d(ioh::common::random::GENERATOR);
@@ -270,12 +271,17 @@ namespace adaptation
             return l;
         }
 
+        virtual int generate_l_n(const double r, const int c) const
+        {
+           return 1;
+        }
+
         virtual void setup_problem(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem)
         {
             this->n = problem->meta_data().n_variables;
         }
 
-        virtual void adapt(const std::vector<SolutionType> &pareto_front, const std::vector<SolutionType> &new_population) {}
+        virtual void adapt(const std::vector<SolutionType> &pareto_front,  std::vector<SolutionType> &new_population) {}
     };
 
     template <typename SolutionType>
@@ -283,11 +289,6 @@ namespace adaptation
     {
         using Strategy<SolutionType>::Strategy;
         
-        // parameters for normalized bit mutation along the two objectives, to be applied to x with max y1 or max y2.
-        double r1 = 1;
-        double r2 = 1;
-        double c1 = 0;
-        double c2 = 0;
         double F = 0.98;
 
         // parameters for the standard bit mutation, to be applied to the other x.
@@ -295,115 +296,55 @@ namespace adaptation
 
         double generate_pm(const int i, const std::vector<SolutionType> &pareto_front) const override
         {
-            // for the x with max y1 
-            if (i == 0)
-            {
-                return r1 / this->n;
-            }
-
-            // for the x with max y2
-            if (i == pareto_front.size() - 1)
-            {
-                return r2 / this->n;
-            }
-
+            
             // for the other x
-            double tmp;
+            double tmp = pareto_front[i].r /(double)this->n;
+            static std::normal_distribution<> standard_norm{0, 1};
 
-            // decrease the mutation rate when moving close to a cluster of solutions
-            if (pareto_front[i].dis < pareto_front[i].previous_dis)
-            {
-                tmp = pareto_front[i].l / 2.0 / this->n;
-            }
+            const auto r = standard_norm(ioh::common::random::GENERATOR);
 
-            // increase the mutation rate when locating at the edge of a cluster
-            else if (pareto_front[i].dis > pareto_front[i].previous_dis)
-            {
-                tmp = pareto_front[i].l * 2.0 / this->n;
-            }
+            tmp =  1.0 / (1.0 + (((1.0 - tmp) / tmp) * exp(0.22 * r)));
 
-            // bias to perform local search (with probability = 0.5)
-            else
-            {
-                tmp = pareto_front[i].l / this->n;
-                if (ioh::common::random::real() > 0.5)
-                {
-                    tmp = tmp / 2.0;
-                }
-            }
 
             tmp = tmp > 0.5 ? 0.5 : tmp;
             tmp = tmp < 1.0 / this->n ? 1.0 / this->n : tmp;
             return tmp;
         }
 
-        int generate_l(const double pm, const int i = 1, const int pareto_size = 0) const override
+        int generate_l(const double pm) const override
         {
-            // for the x with max y1 
-            if (i == 0)
-            {
-                std::normal_distribution<> d{r1, r1 * (1 - r1 / this->n) * pow(F, c1)};
-
-                double l = std::round(d(ioh::common::random::GENERATOR));
-                while (l < 1 || l > this->n / 2)
-                    l = d(ioh::common::random::GENERATOR);
-
-                return static_cast<double>(l);
-            }
-            // for the x with max y2
-            else if (i == pareto_size - 1)
-            {
-                std::normal_distribution<> d{r2, r2 * (1 - r2 / this->n) * pow(F, c2)};
-
-                double l = std::round(d(ioh::common::random::GENERATOR));
-                while (l < 1 || l > this->n / 2)
-                    l = d(ioh::common::random::GENERATOR);
-
-                return static_cast<double>(l);
-            }
-            else
-            {
+            
                 std::binomial_distribution<> d{this->n, pm};
                 int l = d(ioh::common::random::GENERATOR);
                 while (l < 1)
                     l = d(ioh::common::random::GENERATOR);
                 return l;
-            }
+            
         }
 
-        virtual void adapt(const std::vector<SolutionType> &pareto_front, const std::vector<SolutionType> &new_population) override
+        int generate_l_n(const double r, const int c) const override {
+            
+            std::normal_distribution<> d{r, std::sqrt(r * (1 - r / this->n) * pow(F, c))};
+
+            double l = std::round(d(ioh::common::random::GENERATOR));
+            while (l < 1 || l > this->n / 2)
+                l = d(ioh::common::random::GENERATOR);
+
+            return static_cast<double>(l);
+        }
+
+        virtual void adapt(const std::vector<SolutionType> &pareto_front, std::vector<SolutionType> &new_population) override
         {
-            double max_y2 = pareto_front[0].y[1];
-            double max_y1 = pareto_front[pareto_front.size() - 1].y[0];
-            size_t index_y1 = 0, index_y2 = 0;
             for (size_t i = 0; i < new_population.size(); i++)
             {
-                if (max_y1 > new_population[i].y[0])
+                
+                if (new_population[i].r == new_population[i].l)
                 {
-                    max_y1 = new_population[i].y[0];
-                    index_y1 = i;
+                    new_population[i].c += 1.0;
                 }
-                if (max_y2 > new_population[i].y[1])
-                {
-                    max_y2 = new_population[i].y[1];
-                    index_y2 = i;
-                }
-            }
-
-            if (max_y1 > pareto_front[pareto_front.size() - 1].y[0])
-            {
-                if (this->r1 != new_population[index_y1].l)
-                {
-                    c1 = 0;
-                    this->r1 = new_population[index_y1].l;
-                }
-            }
-            if (max_y2 > pareto_front[0].y[1])
-            {
-                if (this->r2 != new_population[index_y2].l)
-                {
-                    c2 = 0;
-                    this->r2 = new_population[index_y2].l;
+                else{
+                    new_population[i].r = new_population[i].l;
+                    new_population[i].c = 0;
                 }
             }
         }
@@ -449,7 +390,7 @@ struct AGSEMO
     void pareto_dis(std::vector<GSolution> & pareto_front) {
         double dis, dis1;
         std::sort(pareto_front.begin(), pareto_front.end(), compare);
-        // dis = std::max(pareto_front[0].y[0] - pareto_front[0].y[0], pareto_front[1].y[1] - pareto_front[1].y[1]);
+        
         dis = std::sqrt(pow(pareto_front[0].y[0] - pareto_front[1].y[0], 2) + pow(pareto_front[0].y[1] - pareto_front[1].y[1], 2));
         pareto_front[0].previous_dis = pareto_front[0].dis;
         pareto_front[0].dis = dis;
@@ -459,6 +400,7 @@ struct AGSEMO
             dis = std::sqrt(pow(pareto_front[i - 1].y[0] - pareto_front[i].y[0], 2) + pow(pareto_front[i - 1].y[1] - pareto_front[i].y[1], 2));
             dis1 = std::sqrt(pow(pareto_front[i + 1].y[0] - pareto_front[i].y[0], 2) + pow(pareto_front[i + 1].y[1] - pareto_front[i].y[1], 2));
             dis = std::max(dis, dis1);
+            
             pareto_front[i].previous_dis = pareto_front[i].dis;
             pareto_front[i].dis = dis;
         }
@@ -471,6 +413,7 @@ struct AGSEMO
     std::vector<GSolution> operator()(const std::shared_ptr<ioh::problem::IntegerSingleObjective> &problem)
     {
         // Preparing pareto_front_star
+        // std::cout << "run"<< std::endl;
         auto pareto_star = std::vector<GSolution>(pre_pareto_y.size());
         for (size_t i = 0; i != pre_pareto_y.size(); ++i)
         {
@@ -492,11 +435,18 @@ struct AGSEMO
                 auto &candidate = new_population[i];
                 int ri;
                 ri = ioh::common::random::integer(0, pareto_front.size() - 1);
-
+                
                 candidate.x = pareto_front[ri].x;
                 candidate.p_y = pareto_front[ri].y;
-                candidate.pm = strategy->generate_pm(ri, pareto_front);
-                candidate.l = strategy->generate_l(candidate.pm, i, pareto_front.size());
+                if ((ri == 0) || (ri == pareto_front.size()-1)) {
+                    candidate.l = strategy->generate_l_n(candidate.r,candidate.c);
+                    candidate.pm = candidate.l / (double)strategy->n;
+                }
+                else{
+                    candidate.pm = strategy->generate_pm(ri, pareto_front);
+                    candidate.l = strategy->generate_l(candidate.pm);
+                }
+                // std::cout << candidate.l << std::endl;
 
                 // Mutate
                 bitflip(candidate.x, candidate.l);

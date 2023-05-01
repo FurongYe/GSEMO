@@ -361,7 +361,7 @@ namespace adaptation
         {
             
             std::vector<double> metrics(new_population.size(), -1.0);
-            if (adapt_metric < 3) {
+            if (adapt_metric <= 3) {
                 auto tmp_pareto_front = pareto_front;
                 for (size_t i = 0; i < new_population.size(); i++)
                 {
@@ -425,41 +425,7 @@ namespace adaptation
                     double m2 = new_population[i].y[1] - best_y2;
                     metrics[i] = r > 0.5 ? m1 : m2;
                 }
-            } else if (adapt_metric == 7) {
-                if (generation % 10 == 0) {
-                    adaptive_y_r = ioh::common::random::real();
-                }
-
-                for (size_t i = 0; i < new_population.size(); i++)
-                {
-                    double m1 = new_population[i].y[0] - new_population[i].p_y[0];
-                    double m2 = new_population[i].y[1] - new_population[i].p_y[1];
-                    metrics[i] = adaptive_y_r > 0.5 ? m1 : m2;
-                }
-                generation++;
             } 
-            else if (adapt_metric == 8) 
-            {
-                if (generation % 50 == 0) {
-                    adaptive_y_r = ioh::common::random::real();
-                }
-                for (size_t i = 0; i < new_population.size(); i++)
-                {
-                    double m1 = new_population[i].y[0] - new_population[i].p_y[0];
-                    double m2 = new_population[i].y[1] - new_population[i].p_y[1] ;
-                    metrics[i] = adaptive_y_r > 0.5 ? m1 : m2;
-                }
-                generation++;
-            } else  {
-                double r = ioh::common::random::real();
-
-                for (size_t i = 0; i < new_population.size(); i++)
-                {
-                    double m1 = new_population[i].y[0] - new_population[i].p_y[0];
-                    double m2 = new_population[i].y[1] - new_population[i].p_y[1];
-                    metrics[i] = r > 0.5 ? m1 : m2;
-                }
-            }
             return metrics;
         }
     };

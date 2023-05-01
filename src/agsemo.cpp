@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
     int runs = std::atoi(argv[6]);
     std::string algorithm_name = argv[7];
 
-    // int problem_id = 4;
+    // int problem_id = 2;
     // int dimension = 100;
     // int lambda = 1;
     // double pm = 1 / static_cast<double>(dimension);
@@ -35,10 +35,10 @@ int main(int argc, char *argv[])
     
     
     
-    std::string exp_name = algorithm_name + "L" + argv[4] + "P" + argv[5];
+    std::string exp_name = algorithm_name + "L" + argv[3] + "P" + argv[4];
     
     auto logger =
-        ioh::logger::Analyzer({ioh::trigger::always}, {ioh::watch::violation}, "MO", exp_name, exp_name, exp_name);
+        ioh::logger::Analyzer({ioh::trigger::always}, {ioh::watch::violation}, "AGSEMO", exp_name, exp_name, exp_name);
 
     problem->attach_logger(logger);
 
@@ -46,9 +46,9 @@ int main(int argc, char *argv[])
     {
         AGSEMO<OptimizationType::MAX, OptimizationType::MAX> opt(budget, force_flip, pm, lambda, algorithm_name);
         auto p = opt(problem);
-        print(p);
-        std::cout << p.size() << std::endl;
-        std::cout << *problem << std::endl;
+        // print(p);
+        // std::cout << p.size() << std::endl;
+        // std::cout << *problem << std::endl;
         problem->reset();
     }
 }

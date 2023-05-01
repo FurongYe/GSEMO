@@ -35,11 +35,29 @@ int main(int argc, char *argv[])
     auto problem = get_problem(problem_id, dimension);
     
     // std::string algorithm_name = "TwoRate";
-    std::string metric = (adapt_metric == 1 ? "HV" : (adapt_metric == 2 ? "IGD" : "NUM"));
+    std::string metric = "";
+    if (adapt_metric == 1) {
+        metric = "HV";
+    } 
+    if (adapt_metric == 2) {
+        metric = "IGD";
+    } 
+    if (adapt_metric == 3) {
+        metric = "NUM";
+    } 
+    if (adapt_metric == 4) {
+        metric = "OneObj%10";
+    }
+    if (adapt_metric == 5) {
+        metric = "OneObj%50";
+    }
+    if (adapt_metric == 6) {
+        metric = "OneObj";
+    }
     std::string exp_name = algorithm_name + "L" + argv[4] + "P" + argv[5] + metric;
     // std::string exp_name = "test";
     auto logger =
-        ioh::logger::Analyzer({ioh::trigger::always}, {ioh::watch::violation}, "MO", exp_name, exp_name, exp_name);
+        ioh::logger::Analyzer({ioh::trigger::always}, {ioh::watch::violation}, "MO-dim-cocz", exp_name, exp_name, exp_name);
 
     problem->attach_logger(logger);
 
